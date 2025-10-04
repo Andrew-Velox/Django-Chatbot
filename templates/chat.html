@@ -294,7 +294,19 @@
     </div>
 
     <div class="chat-input-container">
-      <input type="text" id="msg" placeholder="Type your message here..." autocomplete="off">
+      <div style="display:flex;flex-direction:column;gap:8px;flex:1">
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="rolePreset" style="padding:8px;border-radius:8px;border:1px solid #e0e0e0">
+            <option value="">Default (helpful assistant)</option>
+            <option value="You are a witty and playful storyteller.">Storyteller</option>
+            <option value="You are a strict, formal professor who answers concisely.">Professor</option>
+            <option value="You are a friendly travel guide with lots of tips and local knowledge.">Travel Guide</option>
+            <option value="You are a caring and playful AI girlfriend who loves to chat, listen, and make the user smile.">Girlfriend</option>
+          </select>
+          <input type="text" id="roleInput" placeholder="Or enter a custom role/character..." style="flex:1;padding:8px;border-radius:8px;border:1px solid #e0e0e0">
+        </div>
+        <input type="text" id="msg" placeholder="Type your message here..." autocomplete="off">
+      </div>
       <button id="sendBtn">Send</button>
     </div>
   </div>
@@ -367,6 +379,10 @@
       const input = document.getElementById("msg");
       const msg = input.value.trim();
       if (!msg) return;
+      const rolePreset = document.getElementById('rolePreset').value || '';
+      const roleInput = document.getElementById('roleInput').value.trim() || '';
+      // priority: custom role input > selected preset > empty (backend will use default)
+      const role = roleInput || rolePreset || '';
 
       const chatbox = document.getElementById("chatbox");
       const sendBtn = document.getElementById("sendBtn");
@@ -398,7 +414,7 @@
             "Content-Type": "application/json",
             "X-CSRFToken": csrf
           },
-          body: JSON.stringify({ message: msg }),
+          body: JSON.stringify({ message: msg, role }),
           credentials: 'same-origin',
         });
 
@@ -410,7 +426,20 @@
         if (!response.ok) {
           chatbox.appendChild(createMessage('ai', data.error || 'Something went wrong', true));
         } else {
-          chatbox.appendChild(createMessage('ai', data.reply));
+          const replyText = (data && data.reply && data.reply.trim()) ? data.reply : 'No response from the AI. Please try rephrasing your question.';
+          chatbox.appendChild(createMessage('ai', replyText));
+
+          // If the backend included debug info (DEBUG=True), show it in console and below the chat for diagnosis
+          if (data && data.debug) {
+            console.debug('AI debug payload:', data.debug, 'sent_role:', data.sent_role, 'request_payload:', data.request_payload);
+            const dbg = document.createElement('pre');
+            dbg.style.background = '#f7f7f9';
+            dbg.style.padding = '8px';
+            dbg.style.borderRadius = '8px';
+            dbg.style.marginTop = '8px';
+            dbg.textContent = 'DEBUG: ' + JSON.stringify({ debug: data.debug, sent_role: data.sent_role, request_payload: data.request_payload }, null, 2);
+            chatbox.appendChild(dbg);
+          }
         }
         
         chatbox.scrollTop = chatbox.scrollHeight;
